@@ -62,9 +62,32 @@
   .card button:hover{filter:brightness(1.06)}
   .card button:active{transform:translateY(2px);box-shadow:0 2px 0 #a85f00}
   .card small{display:block;margin-top:18px;font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.65)}
+
+#loading{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#096227 0,#04380f 60%,#02280c 100%);transition:opacity .3s,visibility .3s;--fill:0%}
+#loading.ready{opacity:0;visibility:hidden;pointer-events:none}
+.loading-content{width:min(760px,84vw);text-align:center;color:#fff}
+.logo-progress{position:relative;width:100%;aspect-ratio:3/1;isolation:isolate}
+.logo-progress img{display:block;width:100%;height:100%;object-fit:contain}
+.logo-progress .muted{filter:grayscale(1);opacity:.16}
+.logo-progress .color{position:absolute;inset:0;clip-path:inset(0 calc(100% - var(--fill)) 0 0);transition:clip-path .22s ease-out}
+#loadingPhrase{height:28px;margin:25px 0 8px;font:700 17px 'Inter',sans-serif;letter-spacing:.025em;color:#f8e8bb}
+#loadingPercent{font:600 12px 'Inter',sans-serif;color:#b9d9bd}
+#loadingRetry{display:none;margin:18px auto 0;padding:11px 24px;border:0;border-radius:20px;background:#FF9800;color:#04380f;font-weight:800;cursor:pointer}
+#loading.failed #loadingRetry{display:block}
+
 </style>
 </head>
 <body>
+<div id="loading" aria-label="Se încarcă Broker Tycoon">
+ <div class="loading-content">
+  <div class="logo-progress" role="progressbar" aria-label="Încărcarea jocului" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="logoProgress">
+   <img class="muted" src="assets/brand-logo.png" alt="Broker Tycoon by 123Credit">
+   <img class="color" src="assets/brand-logo.png" alt="" aria-hidden="true">
+  </div>
+  <p id="loadingPhrase" role="status">handshaking…</p><div id="loadingPercent">0%</div>
+  <button id="loadingRetry" type="button" onclick="location.reload()">Încearcă din nou</button>
+ </div>
+</div>
 <canvas id="c"></canvas>
 <div id="intro">
   <div class="card">
@@ -226,7 +249,7 @@ const slotEnabled=i=>i===1?G.assist.length>=1:i===4?G.assist.length>=2:i===5?G.a
 
 const IDLE = [ {x:72,y:460}, {x:824,y:460}, {x:270,y:460}, {x:626,y:460}, {x:448,y:700} ];
 const DOOR = {x:961,y:360},WAYP={x:755,y:360};
-const MINY=30,MAXY=690;
+const MINY=112,MAXY=690;
 const SCANNER = { x:1000, y:236 };
 const MONEYPT = { x:938, y:124 };
 const BTN = { trophy:{x:1142,y:14,w:34,h:34}, snd:{x:1186,y:14,w:34,h:34}, pause:{x:1230,y:14,w:34,h:34}, cta:{x:1084,y:104,w:180,h:40} };
@@ -263,11 +286,13 @@ function resize(){
 }
 addEventListener('resize', resize); resize();
 
+const gameLogo=new Image();gameLogo.src='assets/brand-logo.png';
+let loadingDone=false;
 const logoImg = new Image();
 let logoReady = false;
 logoImg.onload = () => { logoReady = true; };
 logoImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(LOGO_SVG);
-document.getElementById('introLogo').src = logoImg.src;
+document.getElementById('introLogo').src = gameLogo.src;
 
 /* ───────────── UTILS ───────────── */
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -449,7 +474,7 @@ function drawPads(){
  });
 }
 function drawSidebar(){
-  if(logoReady)ctx.drawImage(logoImg,912,12,100,36);
+  if(gameLogo.complete&&gameLogo.naturalWidth)ctx.drawImage(gameLogo,912,4,150,50);
   // butoane rotunde
   const rb=[BTN.snd,BTN.pause];if(LB_ON)rb.unshift(BTN.trophy);
   rb.forEach(b=>{ctx.fillStyle='rgba(0,0,0,.26)';ctx.beginPath();ctx.arc(b.x+17,b.y+17,17,0,7);ctx.fill()});
@@ -728,11 +753,11 @@ const openDesks=()=>Math.min(DESKS.length,1+G.assist.length);
 function furniture(){
  const rects=[{x:0,y:0,w:78,h:H},{x:0,y:0,w:GW,h:70},{x:0,y:702,w:GW,h:18},
  {x:85,y:306,w:126,h:148},{x:104,y:151,w:112,h:106},{x:112,y:574,w:93,h:86},{x:72,y:585,w:45,h:47}];
- for(let i=0;i<openDesks();i++){const d=DESKS[i],x=d.cx,cy=d.base-52;rects.push({x:x-45,y:cy-48,w:102,h:110},{x:x-68,y:cy-47,w:37,h:52})}
+ for(let i=0;i<openDesks();i++){const d=DESKS[i],x=d.cx,cy=d.base-52;rects.push({x:x-60,y:cy-61,w:125,h:130},{x:x-68,y:cy-47,w:37,h:52})}
  return rects;
 }
 function freeAt(x,y){
- if(x<90||x>GW+80||y<30||y>690)return false;
+ if(x<90||x>GW+80||y<MINY||y>690)return false;
  if(x>GW-18&&Math.abs(y-DOOR.y)>62)return false;
  return !furniture().some(r=>x>r.x-10+.001&&x<r.x+r.w+10-.001&&y>r.y-9+.001&&y<r.y+r.h+9-.001);
 }
@@ -1190,10 +1215,16 @@ function drawWall(){
 
 
 
+function worldDepth(x,y){return y+x*.55}
+function deskOccludesHead(d,o){
+ const cy=d.base-52,w=150*DESK_SPRITE[2]/Math.max(DESK_SPRITE[2],DESK_SPRITE[3]),h=150*DESK_SPRITE[3]/Math.max(DESK_SPRITE[2],DESK_SPRITE[3]);
+ return worldDepth(o.x,o.y)<worldDepth(d.cx,d.base+15)&&o.x+8>d.cx-w/2&&o.x-8<d.cx+w/2&&o.y-70>cy-h/2&&o.y-90<cy+h/2;
+}
 function drawEntities(){
- const list=[];for(let i=0;i<openDesks();i++)list.push({y:DESKS[i].cx+40,f:()=>drawDesk(i)});
- G.clients.forEach(c=>list.push({y:c.x,f:()=>drawClient(c)}));G.assist.forEach(a=>list.push({y:a.x,f:()=>drawAssist(a)}));list.push({y:G.p.x,f:drawPlayer});
- list.sort((a,b)=>a.y-b.y).forEach(o=>o.f());
+ const people=[...G.clients,...G.assist,G.p],list=[];
+ for(let i=0;i<openDesks();i++){const d=DESKS[i];list.push({depth:worldDepth(d.cx,d.base+15),f:()=>{ctx.save();if(people.some(o=>deskOccludesHead(d,o)))ctx.globalAlpha=.38;drawDesk(i);ctx.restore()}})}
+ G.clients.forEach(c=>list.push({depth:worldDepth(c.x,c.y),f:()=>drawClient(c)}));G.assist.forEach(a=>list.push({depth:worldDepth(a.x,a.y),f:()=>drawAssist(a)}));list.push({depth:worldDepth(G.p.x,G.p.y),f:drawPlayer});
+ list.sort((a,b)=>a.depth-b.depth).forEach(o=>o.f());
 }
 function arrow(x,y){
   const b=Math.sin(performance.now()/260)*6;ctx.save();ctx.translate(Math.round(x),Math.round(y+b));
@@ -1351,7 +1382,7 @@ try{const n=localStorage.getItem('bt_redesign_name');if(n)document.getElementByI
 let last=performance.now();
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
-  let acc=dt*CONFIG.SPEED;
+  let acc=loadingDone?dt*CONFIG.SPEED:0;
   while(acc>1e-6){const s=Math.min(acc,1/30);step(s);acc-=s}
   render();requestAnimationFrame(frame);
 }
@@ -1366,6 +1397,31 @@ if(CONFIG.DEBUG){
   window.__setLB=rows=>{G.lb={status:'ok',rows};G.lbOpen=true};
   window.__end=()=>endGame();
 }
+function beginLoading(){
+ const layer=document.getElementById('loading'),progress=document.getElementById('logoProgress'),phrase=document.getElementById('loadingPhrase'),percent=document.getElementById('loadingPercent');
+ const started=performance.now(),minimum=2400,phrases=['handshaking…','comparing offers…','negotiating…','convincing the calculator…','stacking commissions…','finding the tiny print…'];
+ const images=[gameLogo,roomArt,deskArt,peopleArt,cargoArt,neutralCarryArt];let loaded=0,failed=false,all=false,shown=0;
+ const wait=im=>new Promise((resolve,reject)=>{
+   const done=()=>{loaded++;resolve()};
+   if(im.complete&&im.naturalWidth){done();return}
+   if(typeof im.addEventListener!=='function'){done();return}
+   im.addEventListener('load',done,{once:true});im.addEventListener('error',reject,{once:true});
+ });
+ Promise.all(images.map(wait)).then(()=>{all=true}).catch(()=>{failed=true;layer.classList.add('failed');phrase.textContent='O piesă nu s-a încărcat. Mai încercăm?';percent.textContent='';});
+ function animate(now){
+   if(failed)return;
+   const elapsed=now-started,target=Math.min(loaded/images.length*.98,elapsed/minimum*.98);
+   shown=Math.max(shown,target);layer.style.setProperty('--fill',(shown*100).toFixed(1)+'%');progress.setAttribute('aria-valuenow',String(Math.floor(shown*100)));percent.textContent=Math.floor(shown*100)+'%';
+   phrase.textContent=phrases[Math.floor(elapsed/780)%phrases.length];
+   if(all&&elapsed>=minimum){layer.style.setProperty('--fill','100%');percent.textContent='100%';progress.setAttribute('aria-valuenow','100');
+     setTimeout(()=>{loadingDone=true;layer.classList.add('ready');layer.setAttribute('aria-hidden','true');},260);return;
+   }
+   requestAnimationFrame(animate);
+ }
+ requestAnimationFrame(animate);
+}
+beginLoading();
+
 requestAnimationFrame(frame);
 })();
 </script>
